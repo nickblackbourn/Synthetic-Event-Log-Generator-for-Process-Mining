@@ -1,12 +1,14 @@
-# Synthetic Event Log Generator for Process Mining
+# Synthetic Event Log Generator
 
-This tool generates a synthetic event log suitable for process mining using the [PM4PY](https://pm4py.fit.fraunhofer.de/) Python package. The generated log can be used for research, teaching, or testing process mining algorithms.
+This tool generates synthetic event logs for process mining and process intelligence use cases. It supports configurable process activities, deviations, case/event attributes, and process variants.
 
 ## Features
-- Reads process context, activities, and deviations from a text file (`variables.txt`).
-- Generates a synthetic event log with columns: `UID`, `Activity`, `Timestamp`.
-- Supports random deviations and activity order shuffling for realistic traces.
-- Outputs a CSV file (`synthetic_event_log.csv`) and can be converted to a PM4PY event log object.
+- **Configurable number of cases**
+- **Precise deviation frequencies** (per-case probability)
+- **Support for case and event attributes**
+- **Process variants with frequency control**
+- **Balance between strict variant order and process realism**
+- **CSV output for easy analysis**
 
 ## Requirements
 - Python 3.7+
@@ -19,34 +21,81 @@ pip install pm4py pandas
 ```
 
 ## Usage
-1. **Prepare `variables.txt`** in the same folder, with the following structure:
-   ```
-   Context:
-   context_var1
-   context_var2
-   Activities:
-   Activity A
-   Activity B
-   Activity C
-   Deviations:
-   Deviation X
-   Deviation Y
-   ```
-2. **Run the script:**
-   ```bash
-   python generate_synthetic_event_log.py
-   ```
-3. **Output:**
-   - `synthetic_event_log.csv` — the generated event log.
 
-## File Descriptions
-- `generate_synthetic_event_log.py` — Main script to generate the event log.
-- `variables.txt` — Input file specifying context, activities, and deviations.
-- `synthetic_event_log.csv` — Output event log in CSV format.
+### 1. Install dependencies
 
-## Customization
-- Change the number of cases or activities by editing the parameters in `generate_event_log()`.
-- Modify the structure of `variables.txt` to suit your process.
+```
+pip install pandas pm4py
+```
+
+### 2. Prepare your variables file
+
+Edit `variables.txt` to define your process, deviations, attributes, and variants. Example:
+
+```
+Context:
+Order-to-Cash process for B2B sales
+
+Activities:
+Receive Order
+Check Credit
+Approve Order
+Pick Items
+Pack Items
+Ship Order
+Send Invoice
+Receive Payment
+
+Deviations:
+Late Payment: 0.15
+Order Change: 0.10
+Partial Shipment: 0.05
+
+CaseAttributes:
+CustomerType: New, Returning, VIP
+Region: North, South, East, West
+
+EventAttributes:
+Resource: Alice, Bob, Carol, Dave
+Channel: Email, Phone, Web
+
+Variants:
+Standard: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.7
+No Credit Check: Receive Order, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.2
+Express: Receive Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
+```
+
+### 3. Run the generator
+
+```
+python generate_synthetic_event_log.py --variables-file variables.txt --output-file synthetic_event_log.csv --n-cases 1000 --random-seed 42 --shuffle-fraction 0.2 --deviation-at-end --max-activities 10
+```
+
+#### Key CLI options for realism and strictness
+- `--shuffle-fraction`: Fraction of cases to shuffle activities for realism (default: 0.2). Set to 0 for strict variant order.
+- `--deviation-at-end`: If set, deviations are always inserted at the end of the activity sequence (preserves variant order).
+- `--random-seed`: Set for reproducible results.
+- `--max-activities`: Maximum number of activities per case (default: 8).
+
+**Tip:**
+- For strict conformance to variants, use `--shuffle-fraction 0 --deviation-at-end`.
+- For more realistic, noisy logs, increase `--shuffle-fraction` and omit `--deviation-at-end`.
+
+### 4. Output
+
+The generated CSV will contain one row per event, with columns for case name, activity, timestamp, and all configured attributes.
+
+## Advanced Configuration
+- **Deviations**: Each deviation is inserted in the exact percentage of cases specified.
+- **Variants**: Frequencies should sum to 1.0. Cases are distributed accordingly.
+- **Attributes**: Add as many case/event attributes as needed; values are randomly assigned.
+
+## Example Output
+| case:concept:name | Activity      | Timestamp           | CustomerType | Region | Resource | Channel |
+|-------------------|--------------|---------------------|--------------|--------|----------|---------|
+| Case_1            | Receive Order| 2025-07-27 10:00:00 | VIP          | North  | Alice    | Email   |
+| Case_1            | Check Credit | 2025-07-27 10:10:00 | VIP          | North  | Bob      | Phone   |
+| ...               | ...          | ...                 | ...          | ...    | ...      | ...     |
 
 ## License
 MIT License

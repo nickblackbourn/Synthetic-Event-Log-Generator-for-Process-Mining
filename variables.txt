@@ -1,27 +1,48 @@
 # variables.txt for Synthetic Event Log Generator
-# Specify process context, activities, and deviations with probabilities.
 #
-# Required sections:
-#   Context:      (optional, for extra info)
-#   Activities:   (required, list each activity on a new line)
-#   Deviations:   (optional, specify as 'Deviation Name: probability' where probability is 0-1)
+# This file defines the process, deviations, attributes, and variants for synthetic event log generation.
 #
-# Example:
+# New CLI options (see README):
+#   --shuffle-fraction: Fraction of cases to shuffle activities for realism (default: 0.2)
+#   --deviation-at-end: If set, deviations are always inserted at the end of the activity sequence
+#   --random-seed: Set for reproducible results
+#   --max-activities: Maximum number of activities per case (default: 8)
+#
+# By default, the generator preserves variant order for most cases, but you can increase realism by adjusting these options.
 
+# Define the process context (optional, for documentation)
 Context:
-Department: Sales
-Region: North
+Order-to-Cash process for B2B sales
 
+# List the main activities in the process
 Activities:
 Receive Order
-Check Inventory
+Check Credit
 Approve Order
+Pick Items
+Pack Items
 Ship Order
-Invoice Customer
+Send Invoice
+Receive Payment
 
+# Define deviations and their per-case probabilities (0.0-1.0)
 Deviations:
-Manual Approval: 0.33
-Backorder: 0.20
-Expedite Shipping: 0.15
-# If you omit the probability, 0.1 (10%) will be used by default
-# Example: Special Handling
+Late Payment: 0.15
+Order Change: 0.10
+Partial Shipment: 0.05
+
+# Define case-level attributes (assigned per case)
+CaseAttributes:
+CustomerType: New, Returning, VIP
+Region: North, South, East, West
+
+# Define event-level attributes (assigned per event)
+EventAttributes:
+Resource: Alice, Bob, Carol, Dave
+Channel: Email, Phone, Web
+
+# Define process variants (optional, with frequencies summing to 1.0)
+Variants:
+Standard: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.7
+No Credit Check: Receive Order, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.2
+Express: Receive Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
