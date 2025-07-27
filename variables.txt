@@ -1,0 +1,15 @@
+Context:
+Department: Sales
+Region: North
+
+Activities:
+Receive Order
+Check Inventory
+Approve Order
+Ship Order
+Invoice Customer
+
+Deviations:
+Manual Approval
+Backorder
+Expedite Shipping
