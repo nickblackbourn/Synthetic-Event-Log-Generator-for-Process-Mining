@@ -1,3 +1,13 @@
+# variables.txt for Synthetic Event Log Generator
+# Specify process context, activities, and deviations with probabilities.
+#
+# Required sections:
+#   Context:      (optional, for extra info)
+#   Activities:   (required, list each activity on a new line)
+#   Deviations:   (optional, specify as 'Deviation Name: probability' where probability is 0-1)
+#
+# Example:
+
 Context:
 Department: Sales
 Region: North
@@ -10,6 +20,8 @@ Ship Order
 Invoice Customer
 
 Deviations:
-Manual Approval
-Backorder
-Expedite Shipping
+Manual Approval: 0.33
+Backorder: 0.20
+Expedite Shipping: 0.15
+# If you omit the probability, 0.1 (10%) will be used by default
+# Example: Special Handling
