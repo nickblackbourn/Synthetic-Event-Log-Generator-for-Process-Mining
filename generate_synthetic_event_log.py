@@ -121,7 +121,8 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
             event = {
                 "case:concept:name": case_name,
                 "Activity": act,
-                "Timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                # Format: yyyy-MM-dd'T'HH:mm:ss.SSS
+                "Timestamp": timestamp.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
             }
             event.update(case_attr_values)
             for attr, values in event_attributes.items():
