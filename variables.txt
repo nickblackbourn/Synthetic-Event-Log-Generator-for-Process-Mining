@@ -1,3 +1,24 @@
+# Default duration between activities (minutes)
+DefaultDuration: 10
+
+# Activity-specific durations
+ActivityDurations:
+  Pack Items: 20
+  Ship Order: 5
+
+# Sequence-specific durations
+SequenceDurations:
+  Approve Order,Pick Items: 15
+
+# Deviation impact on time
+DeviationDurations:
+  Late Payment: +1440  # minutes (1 day)
+  Order Change: +30
+  Partial Shipment: x2
+
+# Attribute-based timing
+TimingPatterns:
+  If CustomerType=VIP and Activity=Pack Items: 40
 ###############################################################
 # variables.txt for Synthetic Event Log Generator
 #

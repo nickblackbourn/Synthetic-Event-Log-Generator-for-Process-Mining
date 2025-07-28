@@ -7,6 +7,56 @@ from pm4py.objects.conversion.log import converter as log_converter
 import argparse
 
 def read_variables(file_path):
+    # New: Parse timing configuration
+    default_duration = 10  # minutes
+    activity_durations = {}
+    sequence_durations = {}
+    deviation_durations = {}
+    timing_patterns = []
+    # Look for timing config lines
+    section = None
+    with open(file_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.lower().startswith("defaultduration:"):
+                default_duration = int(line.split(":", 1)[1].strip())
+            elif line.lower().startswith("activitydurations:"):
+                section = "activitydurations"
+                continue
+            elif line.lower().startswith("sequencedurations:"):
+                section = "sequencedurations"
+                continue
+            elif line.lower().startswith("deviationdurations:"):
+                section = "deviationdurations"
+                continue
+            elif line.lower().startswith("timingpatterns:"):
+                section = "timingpatterns"
+                continue
+            if section == "activitydurations":
+                if ":" in line:
+                    name, val = line.split(":", 1)
+                    activity_durations[name.strip()] = int(val.strip())
+            elif section == "sequencedurations":
+                if ":" in line:
+                    seq, val = line.split(":", 1)
+                    sequence_durations[tuple(s.strip() for s in seq.split(","))] = int(val.strip())
+            elif section == "deviationdurations":
+                if ":" in line:
+                    name, val = line.split(":", 1)
+                    # Remove comments after value (e.g., '+1440  # minutes (1 day)')
+                    val_clean = val.strip().split()[0] if val.strip() else val.strip()
+                    deviation_durations[name.strip()] = val_clean
+            elif section == "timingpatterns":
+                # Only process lines with a colon, no pipe, and integer value
+                if ":" in line and "|" not in line:
+                    cond, val = line.split(":", 1)
+                    val_clean = val.strip()
+                    try:
+                        timing_patterns.append((cond.strip(), int(val_clean)))
+                    except ValueError:
+                        print(f"Warning: Skipping invalid timing pattern value '{val_clean}' on line: {line}")
     context = []
     activities = []
     deviations = {}
@@ -74,15 +124,63 @@ def read_variables(file_path):
                     freq = float(freq_part.strip())
                     act_list = [a.strip() for a in acts.split(",")]
                     variants.append({"name": name.strip(), "activities": act_list, "freq": freq})
-    return context, activities, deviations, case_attributes, event_attributes, variants
+    return context, activities, deviations, case_attributes, event_attributes, variants, {
+        "default": default_duration,
+        "activities": activity_durations,
+        "sequences": sequence_durations,
+        "deviations": deviation_durations,
+        "patterns": timing_patterns
+    }
 
-def generate_event_log(context, activities, deviations, case_attributes, event_attributes, variants, n_cases=100, max_activities=8, shuffle_fraction=0.2, deviation_at_end=False):
+def generate_event_log(context, activities, deviations, case_attributes, event_attributes, variants, n_cases=100, max_activities=8, shuffle_fraction=0.2, deviation_at_end=False, timing_config=None):
     """
     Generate a synthetic event log with strict case count, mostly strict variant order, and controlled realism.
     shuffle_fraction: fraction of cases to shuffle (for realism, 0 disables)
     deviation_at_end: if True, always insert deviations at end; else random position
     """
     data = []
+    # Helper: get duration for activity/sequence/case
+    if timing_config is None:
+        timing_config = {
+            "default": 10,
+            "activities": {},
+            "sequences": {},
+            "deviations": {},
+            "patterns": []
+        }
+    def get_duration(act, prev_acts, case_attrs, timing_config):
+        # Check sequence durations
+        for seq, dur in timing_config["sequences"].items():
+            if len(seq) <= len(prev_acts) and tuple(prev_acts[-len(seq):]) == seq:
+                return dur
+        # Check activity durations
+        if act in timing_config["activities"]:
+            return timing_config["activities"][act]
+        # Check timing patterns
+        for cond, dur in timing_config["patterns"]:
+            # Simple: If CustomerType=VIP and Activity=Pack Items
+            if "Activity=" in cond and f"Activity={act}" in cond:
+                for attr in case_attrs:
+                    if f"{attr}={case_attrs[attr]}" in cond:
+                        return dur
+        return timing_config["default"]
+
+    # Helper: apply deviation time impact
+    def apply_deviation_time(act, deviation, timing_config):
+        impact = timing_config["deviations"].get(deviation)
+        if impact:
+            # Remove comments after value (e.g., '+1440  # minutes (1 day)')
+            impact_clean = impact.split()[0] if impact else impact
+            if impact_clean.startswith("+"):
+                try:
+                    return int(impact_clean[1:])
+                except ValueError:
+                    print(f"Warning: Invalid deviation impact value '{impact_clean}' for deviation '{deviation}'")
+                    return 0
+            elif impact_clean.startswith("x"):
+                # Only support xN for previous duration
+                return impact_clean
+        return 0
     deviation_names = list(deviations.keys())
     deviation_probs = {k: v["prob"] for k, v in deviations.items()}
     if not variants:
@@ -113,7 +211,6 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
                 if deviation_at_end:
                     path.append(dev)
                 elif placement_type and placement_seq:
-                    # Find sequence in path
                     seq_len = len(placement_seq)
                     found = False
                     for idx in range(len(path) - seq_len + 1):
@@ -125,7 +222,6 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
                             found = True
                             break
                     if not found:
-                        # If not found, insert at start (before) or end (after) as fallback
                         if placement_type == "before":
                             path.insert(0, dev)
                         else:
@@ -136,30 +232,40 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
         # Shuffle for a fraction of cases (for realism)
         if random.random() < shuffle_fraction:
             random.shuffle(path)
-        # Truncate if needed, but warn if truncation would cut variant activities
         n_acts = min(len(path), max_activities)
         truncated_path = path[:n_acts]
-        # Ensure all deviations for this case are present in truncated path
         required_devs = [dev for dev in deviation_names if case_id in deviation_cases[dev]]
         for dev in required_devs:
             if dev not in truncated_path:
                 truncated_path = [dev] + truncated_path[:-1]
-        # Assign case attributes
         case_attr_values = {attr: random.choice(values) for attr, values in case_attributes.items()}
         # Generate timestamps and event attributes
         start_time = datetime.now() - timedelta(days=random.randint(0, 365))
+        prev_acts = []
+        prev_duration = None
+        timestamp = start_time
         for j, act in enumerate(truncated_path):
-            timestamp = start_time + timedelta(minutes=10*j + random.randint(0, 5))
+            # Duration logic
+            duration = get_duration(act, prev_acts, case_attr_values, timing_config)
+            # If deviation, apply impact
+            if act in deviation_names:
+                impact = apply_deviation_time(act, act, timing_config)
+                if isinstance(impact, int):
+                    duration += impact
+                elif isinstance(impact, str) and impact.startswith('x') and prev_duration:
+                    duration = int(float(impact[1:]) * prev_duration)
+            timestamp = timestamp + timedelta(minutes=duration)
             event = {
                 "case:concept:name": case_name,
                 "Activity": act,
-                # Format: yyyy-MM-dd'T'HH:mm:ss.SSS
                 "Timestamp": timestamp.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
             }
             event.update(case_attr_values)
             for attr, values in event_attributes.items():
                 event[attr] = random.choice(values)
             data.append(event)
+            prev_acts.append(act)
+            prev_duration = duration
     return pd.DataFrame(data)
 
 if __name__ == "__main__":
@@ -214,11 +320,12 @@ if __name__ == "__main__":
     shuffle_fraction = args.shuffle_fraction
     deviation_at_end = args.deviation_at_end
     max_activities = args.max_activities
-    context, activities, deviations, case_attributes, event_attributes, variants = read_variables(variables_file)
+    context, activities, deviations, case_attributes, event_attributes, variants, timing_config = read_variables(variables_file)
     df = generate_event_log(
         context, activities, deviations, case_attributes, event_attributes, variants,
         n_cases=n_cases, max_activities=max_activities,
-        shuffle_fraction=shuffle_fraction, deviation_at_end=deviation_at_end
+        shuffle_fraction=shuffle_fraction, deviation_at_end=deviation_at_end,
+        timing_config=timing_config
     )
     df = dataframe_utils.convert_timestamp_columns_in_df(df)
     event_log = log_converter.apply(df)
