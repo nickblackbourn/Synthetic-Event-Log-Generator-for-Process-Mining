@@ -290,7 +290,7 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
             event = {
                 "case:concept:name": case_name,
                 "Activity": act,
-                "Timestamp": timestamp.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
+                "Timestamp": timestamp.strftime("%d.%m.%Y %H:%M:%S")
             }
             event.update(case_attr_values)
             for attr, values in event_attributes.items():
@@ -359,7 +359,7 @@ if __name__ == "__main__":
         shuffle_fraction=shuffle_fraction, deviation_at_end=deviation_at_end,
         timing_config=timing_config
     )
-    df = dataframe_utils.convert_timestamp_columns_in_df(df)
+    # Do NOT convert timestamps to ISO format; preserve custom formatting
     event_log = log_converter.apply(df)
     df.to_csv(output_file, index=False)
     print(f"Synthetic event log saved to {output_file}")
