@@ -208,7 +208,35 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
                 dev_info = deviations[dev]
                 placement_type = dev_info["placement_type"]
                 placement_seq = dev_info["placement_seq"]
-                if deviation_at_end:
+                # Strict business rules for deviation placement
+                if dev == "Late Payment":
+                    # Only after 'Send Invoice'
+                    if "Send Invoice" in path:
+                        idx = path.index("Send Invoice")
+                        path.insert(idx + 1, dev)
+                    else:
+                        print(f"Warning: Could not place 'Late Payment' after 'Send Invoice' in case {case_name}")
+                elif dev == "Partial Shipment":
+                    # After 'Pick Items' or 'Pack Items', prefer last occurrence
+                    idx = -1
+                    for act in ["Pack Items", "Pick Items"]:
+                        if act in path:
+                            idx = max(idx, max([i for i, a in enumerate(path) if a == act]))
+                    if idx != -1:
+                        path.insert(idx + 1, dev)
+                    else:
+                        print(f"Warning: Could not place 'Partial Shipment' after 'Pick Items' or 'Pack Items' in case {case_name}")
+                elif dev == "Order Change":
+                    # After 'Approve Order' and before 'Ship Order'
+                    if "Approve Order" in path and "Ship Order" in path:
+                        idx_approve = path.index("Approve Order")
+                        idx_ship = path.index("Ship Order")
+                        # Place after 'Approve Order' but before 'Ship Order'
+                        insert_at = idx_approve + 1 if idx_approve + 1 < idx_ship else idx_ship
+                        path.insert(insert_at, dev)
+                    else:
+                        print(f"Warning: Could not place 'Order Change' after 'Approve Order' and before 'Ship Order' in case {case_name}")
+                elif deviation_at_end:
                     path.append(dev)
                 elif placement_type and placement_seq:
                     seq_len = len(placement_seq)
