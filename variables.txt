@@ -1,3 +1,4 @@
+###############################################################
 # variables.txt for Synthetic Event Log Generator
 #
 # This file defines the process, deviations, attributes, and variants for synthetic event log generation.
@@ -9,6 +10,39 @@
 #   --max-activities: Maximum number of activities per case (default: 8)
 #
 # By default, the generator preserves variant order for most cases, but you can increase realism by adjusting these options.
+#
+# SECTION EXAMPLES:
+#
+# Context:
+#   Order-to-Cash process for B2B sales
+#
+# Activities:
+#   Receive Order
+#   Check Credit
+#   Approve Order
+#   ...
+#
+# Deviations:
+#   Late Payment: 0.15
+#   Order Change: 0.10
+#   ...
+#
+# CaseAttributes:
+#   CustomerType: New, Returning, VIP
+#   Region: North, South, East, West
+#
+# EventAttributes:
+#   Resource: Alice, Bob, Carol, Dave
+#   Channel: Email, Phone, Web
+#
+# Variants:
+#   Standard: Receive Order, Check Credit, Approve Order, ... | 0.7
+#   Express: Receive Order, Pick Items, ... | 0.1
+#
+# DemoPatterns:
+#   # Bottleneck: Pack Items takes longer for VIP customers
+#   # Rework: Pick Items repeated if Order Change occurs
+###############################################################
 
 # Define the process context (optional, for documentation)
 Context:
@@ -46,3 +80,7 @@ Variants:
 Standard: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.7
 No Credit Check: Receive Order, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.2
 Express: Receive Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
+
+# DemoPatterns:
+#   # Bottleneck: Pack Items takes longer for VIP customers
+#   # Rework: Pick Items repeated if Order Change occurs
