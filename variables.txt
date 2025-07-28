@@ -1,52 +1,64 @@
-# Default duration between activities (minutes)
-DefaultDuration: 10
-
-# Activity-specific durations
+# Example variables.txt for a long-running case management process
+Context: Case Management for Insurance Claims
+Activities:
+Register Claim
+Initial Assessment
+Request Documents
+Review Documents
+Schedule Inspection
+Conduct Inspection
+Prepare Report
+Approve Claim
+Request Additional Info
+Reassess Claim
+Final Approval
+Issue Payment
+Close Case
+Deviations:
+Late Document Submission: 0.15 | after=Request Documents
+Missed Inspection: 0.05 | after=Schedule Inspection
+Appeal: 0.10 | after=Final Approval
+Fraud Investigation: 0.03 | after=Initial Assessment
+CaseAttributes:
+ClaimType: Auto, Home, Health, Life
+Region: North, South, East, West
+CustomerType: Individual, Business
+EventAttributes:
+Resource: Alice, Bob, Carol, Dave, Eve, Frank
+Channel: Email, Phone, Web, Mail
+Variants:
+Standard: Register Claim, Initial Assessment, Request Documents, Review Documents, Schedule Inspection, Conduct Inspection, Prepare Report, Approve Claim, Final Approval, Issue Payment, Close Case | 0.6
+FastTrack: Register Claim, Initial Assessment, Request Documents, Review Documents, Approve Claim, Final Approval, Issue Payment, Close Case | 0.2
+AppealProcess: Register Claim, Initial Assessment, Request Documents, Review Documents, Schedule Inspection, Conduct Inspection, Prepare Report, Approve Claim, Request Additional Info, Reassess Claim, Final Approval, Issue Payment, Close Case | 0.2
+DefaultDuration: 43200  # minutes (30 days)
 ActivityDurations:
-  Pack Items: 20
-  Ship Order: 5
-
-# Sequence-specific durations
+Register Claim: 1440
+Initial Assessment: 2880
+Request Documents: 4320
+Review Documents: 2880
+Schedule Inspection: 1440
+Conduct Inspection: 2880
+Prepare Report: 2880
+Approve Claim: 1440
+Request Additional Info: 2880
+Reassess Claim: 2880
+Final Approval: 1440
+Issue Payment: 1440
+Close Case: 720
 SequenceDurations:
-  Approve Order,Pick Items: 15
-
-# Deviation impact on time
+Request Documents, Late Document Submission: 10080  # 1 week
+Schedule Inspection, Missed Inspection: 4320  # 3 days
+Final Approval, Appeal: 20160  # 2 weeks
 DeviationDurations:
-  Late Payment: +1440  # minutes (1 day)
-  Order Change: +30
-  Partial Shipment: x2
-
-# Attribute-based timing
+Late Document Submission: +4320  # 3 days
+Missed Inspection: +2880  # 2 days
+Appeal: +20160  # 2 weeks
+Fraud Investigation: +43200  # 30 days
 TimingPatterns:
-  If CustomerType=VIP and Activity=Pack Items: 40
-###############################################################
-# variables.txt for Synthetic Event Log Generator
-#
-# This file defines the process, deviations, attributes, and variants for synthetic event log generation.
-#
-# New CLI options (see README):
-#   --shuffle-fraction: Fraction of cases to shuffle activities for realism (default: 0.2)
-#   --deviation-at-end: If set, deviations are always inserted at the end of the activity sequence
-#   --random-seed: Set for reproducible results
-#   --max-activities: Maximum number of activities per case (default: 8)
-#
-# By default, the generator preserves variant order for most cases, but you can increase realism by adjusting these options.
-#
-# SECTION EXAMPLES:
-#
-# Context:
-#   Order-to-Cash process for B2B sales
-#
-# Activities:
-#   Receive Order
-#   Check Credit
-#   Approve Order
-#   ...
-#
-# Deviations:
-#   Late Payment: 0.15
-#   Order Change: 0.10
-#   ...
+ClaimType=Auto and Activity=Conduct Inspection: 1440
+ClaimType=Home and Activity=Conduct Inspection: 2880
+ClaimType=Health and Activity=Review Documents: 4320
+CustomerType=Business and Activity=Prepare Report: 4320
 #
 # CaseAttributes:
 #   CustomerType: New, Returning, VIP

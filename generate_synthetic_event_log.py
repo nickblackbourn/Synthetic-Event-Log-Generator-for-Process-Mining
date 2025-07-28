@@ -21,7 +21,9 @@ def read_variables(file_path):
             if not line or line.startswith("#"):
                 continue
             if line.lower().startswith("defaultduration:"):
-                default_duration = int(line.split(":", 1)[1].strip())
+                # Only use the first integer, ignore comments
+                val = line.split(":", 1)[1].strip().split()[0]
+                default_duration = int(val)
             elif line.lower().startswith("activitydurations:"):
                 section = "activitydurations"
                 continue
@@ -41,7 +43,9 @@ def read_variables(file_path):
             elif section == "sequencedurations":
                 if ":" in line:
                     seq, val = line.split(":", 1)
-                    sequence_durations[tuple(s.strip() for s in seq.split(","))] = int(val.strip())
+                    # Only use the first integer, ignore comments
+                    val_clean = val.strip().split()[0] if val.strip() else val.strip()
+                    sequence_durations[tuple(s.strip() for s in seq.split(","))] = int(val_clean)
             elif section == "deviationdurations":
                 if ":" in line:
                     name, val = line.split(":", 1)
