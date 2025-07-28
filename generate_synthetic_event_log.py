@@ -42,11 +42,22 @@ def read_variables(file_path):
             elif section == "activities":
                 activities.append(line)
             elif section == "deviations":
+                # Support: DeviationName: prob | before=... or | after=...
                 if ":" in line:
-                    name, prob = line.split(":", 1)
-                    deviations[name.strip()] = float(prob.strip())
+                    name_prob, *placement_parts = line.split("|", 1)
+                    name, prob = name_prob.split(":", 1)
+                    dev = {"prob": float(prob.strip()), "placement": None, "placement_type": None, "placement_seq": None}
+                    if placement_parts:
+                        placement = placement_parts[0].strip()
+                        if placement.startswith("before="):
+                            dev["placement_type"] = "before"
+                            dev["placement_seq"] = [x.strip() for x in placement[len("before="):].split(",")]
+                        elif placement.startswith("after="):
+                            dev["placement_type"] = "after"
+                            dev["placement_seq"] = [x.strip() for x in placement[len("after="):].split(",")]
+                    deviations[name.strip()] = dev
                 else:
-                    deviations[line] = 0.1
+                    deviations[line] = {"prob": 0.1, "placement": None, "placement_type": None, "placement_seq": None}
             elif section == "caseattributes":
                 if ":" in line:
                     name, values = line.split(":", 1)
@@ -73,7 +84,7 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
     """
     data = []
     deviation_names = list(deviations.keys())
-    deviation_probs = deviations
+    deviation_probs = {k: v["prob"] for k, v in deviations.items()}
     if not variants:
         variants = [{"name": "Default", "activities": activities, "freq": 1.0}]
     n_cases_list = list(range(1, n_cases + 1))
@@ -96,8 +107,29 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
         # Insert deviations for this case if preselected
         for dev in deviation_names:
             if case_id in deviation_cases[dev]:
+                dev_info = deviations[dev]
+                placement_type = dev_info["placement_type"]
+                placement_seq = dev_info["placement_seq"]
                 if deviation_at_end:
                     path.append(dev)
+                elif placement_type and placement_seq:
+                    # Find sequence in path
+                    seq_len = len(placement_seq)
+                    found = False
+                    for idx in range(len(path) - seq_len + 1):
+                        if path[idx:idx+seq_len] == placement_seq:
+                            if placement_type == "before":
+                                path.insert(idx, dev)
+                            elif placement_type == "after":
+                                path.insert(idx+seq_len, dev)
+                            found = True
+                            break
+                    if not found:
+                        # If not found, insert at start (before) or end (after) as fallback
+                        if placement_type == "before":
+                            path.insert(0, dev)
+                        else:
+                            path.append(dev)
                 else:
                     insert_at = random.randint(1, len(path)) if len(path) > 1 else 1
                     path.insert(insert_at, dev)

@@ -47,9 +47,16 @@ Send Invoice
 Receive Payment
 
 Deviations:
-Late Payment: 0.15
-Order Change: 0.10
-Partial Shipment: 0.05
+# You can specify where the deviation should occur using | before=<activity/sequence> or | after=<activity/sequence>
+# Only one placement modifier ('before' or 'after') is allowed per deviation.
+# For sequences, use comma-separated activities (no spaces).
+# Examples:
+# Late Payment: 0.15 | after=Send Invoice
+# Order Change: 0.10 | before=Pick Items
+# Partial Shipment: 0.05 | after=Approve Order,Pick Items
+Late Payment: 0.15 | after=Send Invoice
+Order Change: 0.10 | before=Pick Items
+Partial Shipment: 0.05 | after=Approve Order,Pick Items
 
 CaseAttributes:
 CustomerType: New, Returning, VIP
