@@ -240,8 +240,6 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
                         path.insert(insert_at, dev)
                     else:
                         print(f"Warning: Could not place 'Order Change' after 'Approve Order' and before 'Ship Order' in case {case_name}")
-                elif deviation_at_end:
-                    path.append(dev)
                 elif placement_type and placement_seq:
                     seq_len = len(placement_seq)
                     found = False
@@ -254,13 +252,9 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
                             found = True
                             break
                     if not found:
-                        if placement_type == "before":
-                            path.insert(0, dev)
-                        else:
-                            path.append(dev)
-                else:
-                    insert_at = random.randint(1, len(path)) if len(path) > 1 else 1
-                    path.insert(insert_at, dev)
+                        print(f"Warning: Could not place deviation '{dev}' {placement_type} sequence {placement_seq} in case {case_name}")
+                    # Do NOT place deviation if not found
+                # Remove fallback random/at-end placement: skip deviation if not handled above
         # Shuffle for a fraction of cases (for realism)
         if random.random() < shuffle_fraction:
             random.shuffle(path)

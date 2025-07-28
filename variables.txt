@@ -1,87 +1,9 @@
-# Example variables.txt for a long-running case management process
-Context: Case Management for Insurance Claims
-Activities:
-Register Claim
-Initial Assessment
-Request Documents
-Review Documents
-Schedule Inspection
-Conduct Inspection
-Prepare Report
-Approve Claim
-Request Additional Info
-Reassess Claim
-Final Approval
-Issue Payment
-Close Case
-Deviations:
-Late Document Submission: 0.15 | after=Request Documents
-Missed Inspection: 0.05 | after=Schedule Inspection
-Appeal: 0.10 | after=Final Approval
-Fraud Investigation: 0.03 | after=Initial Assessment
-CaseAttributes:
-ClaimType: Auto, Home, Health, Life
-Region: North, South, East, West
-CustomerType: Individual, Business
-EventAttributes:
-Resource: Alice, Bob, Carol, Dave, Eve, Frank
-Channel: Email, Phone, Web, Mail
-Variants:
-Standard: Register Claim, Initial Assessment, Request Documents, Review Documents, Schedule Inspection, Conduct Inspection, Prepare Report, Approve Claim, Final Approval, Issue Payment, Close Case | 0.6
-FastTrack: Register Claim, Initial Assessment, Request Documents, Review Documents, Approve Claim, Final Approval, Issue Payment, Close Case | 0.2
-AppealProcess: Register Claim, Initial Assessment, Request Documents, Review Documents, Schedule Inspection, Conduct Inspection, Prepare Report, Approve Claim, Request Additional Info, Reassess Claim, Final Approval, Issue Payment, Close Case | 0.2
-DefaultDuration: 43200  # minutes (30 days)
-ActivityDurations:
-Register Claim: 1440
-Initial Assessment: 2880
-Request Documents: 4320
-Review Documents: 2880
-Schedule Inspection: 1440
-Conduct Inspection: 2880
-Prepare Report: 2880
-Approve Claim: 1440
-Request Additional Info: 2880
-Reassess Claim: 2880
-Final Approval: 1440
-Issue Payment: 1440
-Close Case: 720
-SequenceDurations:
-Request Documents, Late Document Submission: 10080  # 1 week
-Schedule Inspection, Missed Inspection: 4320  # 3 days
-Final Approval, Appeal: 20160  # 2 weeks
-DeviationDurations:
-Late Document Submission: +4320  # 3 days
-Missed Inspection: +2880  # 2 days
-Appeal: +20160  # 2 weeks
-Fraud Investigation: +43200  # 30 days
-TimingPatterns:
-ClaimType=Auto and Activity=Conduct Inspection: 1440
-ClaimType=Home and Activity=Conduct Inspection: 2880
-ClaimType=Health and Activity=Review Documents: 4320
-CustomerType=Business and Activity=Prepare Report: 4320
-#
-# CaseAttributes:
-#   CustomerType: New, Returning, VIP
-#   Region: North, South, East, West
-#
-# EventAttributes:
-#   Resource: Alice, Bob, Carol, Dave
-#   Channel: Email, Phone, Web
-#
-# Variants:
-#   Standard: Receive Order, Check Credit, Approve Order, ... | 0.7
-#   Express: Receive Order, Pick Items, ... | 0.1
-#
-# DemoPatterns:
-#   # Bottleneck: Pack Items takes longer for VIP customers
-#   # Rework: Pick Items repeated if Order Change occurs
 ###############################################################
+# Order-to-Cash process for B2B sales
+# Scenario: A B2B company processes customer orders with credit checks, picking, packing, shipping, invoicing, and payment. Deviations and variants illustrate real-world complexity for process mining analysis.
 
-# Define the process context (optional, for documentation)
-Context:
-Order-to-Cash process for B2B sales
+Context: Order-to-Cash process for B2B sales
 
-# List the main activities in the process
 Activities:
 Receive Order
 Check Credit
@@ -92,34 +14,51 @@ Ship Order
 Send Invoice
 Receive Payment
 
-# Define deviations and their per-case probabilities (0.0-1.0)
-# You can specify where the deviation should occur using | before=<activity/sequence> or | after=<activity/sequence>
-# Only one placement modifier ('before' or 'after') is allowed per deviation.
-# For sequences, use comma-separated activities (no spaces).
-# Examples:
-# Late Payment: 0.15 | after=Send Invoice
-# Order Change: 0.10 | before=Pick Items
-# Partial Shipment: 0.05 | after=Approve Order,Pick Items
+# Deviations (with plausible business logic)
+# - Late Payment: Customer pays invoice late (after Send Invoice)
+# - Order Change: Customer requests change after approval but before picking
+# - Partial Shipment: Only part of the order is shipped (after picking)
 Deviations:
 Late Payment: 0.15 | after=Send Invoice
 Order Change: 0.10 | before=Pick Items
-Partial Shipment: 0.05 | after=Approve Order,Pick Items
+Partial Shipment: 0.05 | after=Pick Items
 
-# Define case-level attributes (assigned per case)
+# Case-level attributes
 CaseAttributes:
 CustomerType: New, Returning, VIP
 Region: North, South, East, West
 
-# Define event-level attributes (assigned per event)
+# Event-level attributes
 EventAttributes:
 Resource: Alice, Bob, Carol, Dave
 Channel: Email, Phone, Web
 
-# Define process variants (optional, with frequencies summing to 1.0)
+# Variants (showing process diversity)
+# - Standard: Full process with credit check
+# - No Credit Check: Trusted customers skip credit check
+# - Express: Fastest route, minimal steps
 Variants:
 Standard: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.7
 No Credit Check: Receive Order, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.2
 Express: Receive Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
+
+# Activity durations (in minutes)
+DefaultDuration: 1440  # 1 day per activity
+ActivityDurations:
+Receive Order: 60
+Check Credit: 240
+Approve Order: 120
+Pick Items: 180
+Pack Items: 120
+Ship Order: 360
+Send Invoice: 60
+Receive Payment: 4320  # 3 days
+
+# Deviation durations (impact in minutes)
+DeviationDurations:
+Late Payment: +2880  # 2 days
+Order Change: +180   # 3 hours
+Partial Shipment: +720  # 12 hours
 
 # DemoPatterns:
 #   # Bottleneck: Pack Items takes longer for VIP customers
