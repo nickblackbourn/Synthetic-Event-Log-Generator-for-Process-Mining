@@ -39,17 +39,23 @@ def read_variables(file_path):
             if section == "activitydurations":
                 if ":" in line:
                     name, val = line.split(":", 1)
-                    activity_durations[name.strip()] = int(val.strip())
+                    # Remove comments after value (e.g., '4320  # 3 days')
+                    val_clean = val.strip().split()[0] if val.strip() else val.strip()
+                    try:
+                        activity_durations[name.strip()] = int(val_clean)
+                    except ValueError:
+                        print(f"Warning: Skipping invalid activity duration value '{val}' for activity '{name.strip()}'")
             elif section == "sequencedurations":
                 if ":" in line:
                     seq, val = line.split(":", 1)
-                    # Only use the first integer, ignore comments
                     val_clean = val.strip().split()[0] if val.strip() else val.strip()
-                    sequence_durations[tuple(s.strip() for s in seq.split(","))] = int(val_clean)
+                    try:
+                        sequence_durations[tuple(s.strip() for s in seq.split(","))] = int(val_clean)
+                    except ValueError:
+                        print(f"Warning: Skipping invalid sequence duration value '{val}' for sequence '{seq}'")
             elif section == "deviationdurations":
                 if ":" in line:
                     name, val = line.split(":", 1)
-                    # Remove comments after value (e.g., '+1440  # minutes (1 day)')
                     val_clean = val.strip().split()[0] if val.strip() else val.strip()
                     deviation_durations[name.strip()] = val_clean
             elif section == "timingpatterns":
@@ -96,22 +102,24 @@ def read_variables(file_path):
             elif section == "activities":
                 activities.append(line)
             elif section == "deviations":
-                # Support: DeviationName: prob | before=... or | after=...
+                # Support: DeviationName: prob | before=... or | after=... | steps=...
                 if ":" in line:
-                    name_prob, *placement_parts = line.split("|", 1)
+                    parts = [p.strip() for p in line.split("|")]
+                    name_prob = parts[0]
                     name, prob = name_prob.split(":", 1)
-                    dev = {"prob": float(prob.strip()), "placement": None, "placement_type": None, "placement_seq": None}
-                    if placement_parts:
-                        placement = placement_parts[0].strip()
-                        if placement.startswith("before="):
+                    dev = {"prob": float(prob.strip()), "placement": None, "placement_type": None, "placement_seq": None, "steps": None}
+                    for p in parts[1:]:
+                        if p.startswith("before="):
                             dev["placement_type"] = "before"
-                            dev["placement_seq"] = [x.strip() for x in placement[len("before="):].split(",")]
-                        elif placement.startswith("after="):
+                            dev["placement_seq"] = [x.strip() for x in p[len("before="):].split(",")]
+                        elif p.startswith("after="):
                             dev["placement_type"] = "after"
-                            dev["placement_seq"] = [x.strip() for x in placement[len("after="):].split(",")]
+                            dev["placement_seq"] = [x.strip() for x in p[len("after="):].split(",")]
+                        elif p.startswith("steps="):
+                            dev["steps"] = [x.strip() for x in p[len("steps="):].split(",")]
                     deviations[name.strip()] = dev
                 else:
-                    deviations[line] = {"prob": 0.1, "placement": None, "placement_type": None, "placement_seq": None}
+                    deviations[line] = {"prob": 0.1, "placement": None, "placement_type": None, "placement_seq": None, "steps": None}
             elif section == "caseattributes":
                 if ":" in line:
                     name, values = line.split(":", 1)
@@ -212,49 +220,27 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
                 dev_info = deviations[dev]
                 placement_type = dev_info["placement_type"]
                 placement_seq = dev_info["placement_seq"]
-                # Strict business rules for deviation placement
-                if dev == "Late Payment":
-                    # Only after 'Send Invoice'
-                    if "Send Invoice" in path:
-                        idx = path.index("Send Invoice")
-                        path.insert(idx + 1, dev)
-                    else:
-                        print(f"Warning: Could not place 'Late Payment' after 'Send Invoice' in case {case_name}")
-                elif dev == "Partial Shipment":
-                    # After 'Pick Items' or 'Pack Items', prefer last occurrence
-                    idx = -1
-                    for act in ["Pack Items", "Pick Items"]:
-                        if act in path:
-                            idx = max(idx, max([i for i, a in enumerate(path) if a == act]))
-                    if idx != -1:
-                        path.insert(idx + 1, dev)
-                    else:
-                        print(f"Warning: Could not place 'Partial Shipment' after 'Pick Items' or 'Pack Items' in case {case_name}")
-                elif dev == "Order Change":
-                    # After 'Approve Order' and before 'Ship Order'
-                    if "Approve Order" in path and "Ship Order" in path:
-                        idx_approve = path.index("Approve Order")
-                        idx_ship = path.index("Ship Order")
-                        # Place after 'Approve Order' but before 'Ship Order'
-                        insert_at = idx_approve + 1 if idx_approve + 1 < idx_ship else idx_ship
-                        path.insert(insert_at, dev)
-                    else:
-                        print(f"Warning: Could not place 'Order Change' after 'Approve Order' and before 'Ship Order' in case {case_name}")
-                elif placement_type and placement_seq:
+                dev_steps = dev_info.get("steps") or [dev]
+                # Multi-step deviation placement
+                if placement_type and placement_seq:
                     seq_len = len(placement_seq)
                     found = False
                     for idx in range(len(path) - seq_len + 1):
                         if path[idx:idx+seq_len] == placement_seq:
                             if placement_type == "before":
-                                path.insert(idx, dev)
+                                for offset, step in enumerate(dev_steps):
+                                    path.insert(idx + offset, step)
                             elif placement_type == "after":
-                                path.insert(idx+seq_len, dev)
+                                for offset, step in enumerate(dev_steps):
+                                    path.insert(idx + seq_len + offset, step)
                             found = True
                             break
                     if not found:
                         print(f"Warning: Could not place deviation '{dev}' {placement_type} sequence {placement_seq} in case {case_name}")
                     # Do NOT place deviation if not found
-                # Remove fallback random/at-end placement: skip deviation if not handled above
+                else:
+                    # Fallback: skip placement if no valid placement_type/seq
+                    print(f"Warning: No valid placement for deviation '{dev}' in case {case_name}")
         # Shuffle for a fraction of cases (for realism)
         if random.random() < shuffle_fraction:
             random.shuffle(path)
