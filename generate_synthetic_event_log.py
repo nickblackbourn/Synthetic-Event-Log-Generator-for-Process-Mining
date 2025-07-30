@@ -58,18 +58,63 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
         variant_case_counts[0] += 1
     while sum(variant_case_counts) > n_cases:
         variant_case_counts[0] -= 1
-    case_variant_assignment = []
-    for idx, v in enumerate(variants):
-        case_variant_assignment += [idx] * variant_case_counts[idx]
-    # No shuffling for strict order; remove random.shuffle for production strictness
 
-    # Prepare deviation assignment: for each deviation, assign to correct number of cases
+    # Helper: check if a case's attributes match a filter dict (all keys/values must match)
+    def attributes_match(case_attrs, filter_attrs):
+        if not filter_attrs:
+            return True
+        for k, v in filter_attrs.items():
+            if case_attrs.get(k) != v:
+                return False
+        return True
+
+    # Precompute all possible case attribute combinations
+    from itertools import product
+    attr_keys = list(case_attributes.keys())
+    attr_values_product = list(product(*[case_attributes[k] for k in attr_keys]))
+    all_case_attr_combos = [dict(zip(attr_keys, vals)) for vals in attr_values_product]
+
+    # For each case, assign attributes, then select allowed variants
+    case_attr_values_list = []
+    for _ in n_cases_list:
+        case_attr_values_list.append(random.choice(all_case_attr_combos))
+
+    # For each variant, precompute which attribute combos it allows
+    variant_allowed_attrs = []
+    for v in variants:
+        filter_attrs = v.get("attributes", {})
+        allowed = [i for i, attrs in enumerate(case_attr_values_list) if attributes_match(attrs, filter_attrs)]
+        variant_allowed_attrs.append(set(allowed))
+
+    # Assign variants to cases, respecting attribute filters and frequencies
+    case_variant_assignment = [None] * n_cases
+    remaining_counts = variant_case_counts.copy()
+    for idx, allowed_idxs in enumerate(variant_allowed_attrs):
+        count = remaining_counts[idx]
+        # Find available cases for this variant
+        available = [i for i in allowed_idxs if case_variant_assignment[i] is None]
+        chosen = random.sample(available, min(count, len(available)))
+        for i in chosen:
+            case_variant_assignment[i] = idx
+        remaining_counts[idx] -= len(chosen)
+    # Any unassigned cases: assign to first variant (fallback)
+    for i in range(n_cases):
+        if case_variant_assignment[i] is None:
+            case_variant_assignment[i] = 0
+
+    # Prepare deviation assignment: for each deviation, assign to correct number of cases, respecting attribute filters
     deviation_names = [dev['name'] for dev in deviations]
     deviation_probs = {dev['name']: dev['probability'] for dev in deviations}
     deviation_steps_set = set()
     for dev in deviations:
         deviation_steps_set.update(dev['steps'])
-    deviation_case_ids = {dev['name']: set(random.sample(n_cases_list, int(round(deviation_probs[dev['name']] * n_cases)))) for dev in deviations}
+    # For each deviation, only assign to cases whose attributes match
+    deviation_case_ids = {}
+    for dev in deviations:
+        filter_attrs = dev.get("attributes", {})
+        eligible_cases = [i+1 for i, attrs in enumerate(case_attr_values_list) if attributes_match(attrs, filter_attrs)]
+        n_assign = int(round(deviation_probs[dev['name']] * n_cases))
+        deviation_case_ids[dev['name']] = set(random.sample(eligible_cases, min(n_assign, len(eligible_cases))))
 
     # Track which deviations were actually placed
     placed_deviation_counts = {dev: 0 for dev in deviation_names}
@@ -77,7 +122,8 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
 
     for i, case_id in enumerate(n_cases_list):
         case_name = f"Case_{case_id}"
-        variant = variants[case_variant_assignment[i]]
+        case_attr_values = case_attr_values_list[i-1] if case_id > 0 else case_attr_values_list[0]
+        variant = variants[case_variant_assignment[i-1] if case_id > 0 else 0]
         path = variant.get("sequence", variant.get("activities", [])).copy()
         # Insert deviations for this case if preselected
         for dev in deviations:
@@ -98,7 +144,6 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
             print(f"Warning: Case {case_id} starts with deviation step '{path[0]}'. Skipping this case.")
             continue
         # Build the case events
-        case_attr_values = {attr: random.choice(values) for attr, values in case_attributes.items()}
         start_time = datetime.now() - timedelta(days=random.randint(0, 365))
         timestamp = start_time
         for j, act in enumerate(path):
