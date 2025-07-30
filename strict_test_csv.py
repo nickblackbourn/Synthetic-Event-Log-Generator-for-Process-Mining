@@ -1,6 +1,3 @@
-import pandas as pd
-import difflib
-
 def strict_test(csv_path, variables_path):
     df = pd.read_csv(csv_path)
     with open(variables_path, "r") as f:
@@ -9,10 +6,6 @@ def strict_test(csv_path, variables_path):
     activities = []
     deviations = []
     case_attributes = {}
-
-import pandas as pd
-import re
-
 def parse_variables_txt(path):
     activities = set()
     variants = {}
@@ -44,7 +37,6 @@ def parse_variables_txt(path):
                 if steps:
                     deviations.update([s.strip() for s in steps.group(1).split(',')])
     return activities, variants, deviations
-
 def main():
     activities, variants, deviations = parse_variables_txt('variables.txt')
     expected_activities = activities | deviations
@@ -60,9 +52,36 @@ def main():
         print(f'- Extra activities in CSV: {sorted(extra)}')
     if not missing and not extra:
         print('STRICT TEST PASSED: All activities present as specified.')
-
-if __name__ == '__main__':
     main()
+import pandas as pd
+import yaml
+import difflib
+
+def main():
+    # Load YAML config
+    with open('variables.txt', 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+    activities = set(config.get('activities', []))
+    deviations = set()
+    for dev in config.get('deviations', []):
+        deviations.update(dev.get('steps', []))
+    expected_activities = activities | deviations
+    case_attributes = config.get('case_attributes', {})
+    event_attributes = config.get('event_attributes', {})
+    variants = config.get('variants', [])
+
+    df = pd.read_csv('synthetic_event_log.csv')
+    found_activities = set(df['Activity'].unique())
+    missing = expected_activities - found_activities
+    extra = found_activities - expected_activities
+    errors = []
+    if missing:
+        errors.append(f"Missing activities in CSV: {sorted(missing)}")
+    if extra:
+        errors.append(f"Extra activities in CSV: {sorted(extra)}")
+
+    # Case attributes
+    for attr, values in case_attributes.items():
         if attr not in df.columns:
             errors.append(f"Case attribute '{attr}' missing from CSV columns")
         else:
@@ -86,13 +105,14 @@ if __name__ == '__main__':
     # Variants: check if all variant activity sequences appear in at least one case
     for v in variants:
         found = False
+        seq = v.get('sequence', v.get('activities', []))
         for case in df["case:concept:name"].unique():
             acts = df[df["case:concept:name"] == case]["Activity"].tolist()
-            if difflib.SequenceMatcher(None, acts, v["activities"]).ratio() > 0.95:
+            if difflib.SequenceMatcher(None, acts, seq).ratio() > 0.95:
                 found = True
                 break
         if not found:
-            errors.append(f"Variant '{v['name']}' activity sequence not found in any case (or not exact)")
+            errors.append(f"Variant '{v.get('name','?')}' activity sequence not found in any case (or not exact)")
     # Report
     if errors:
         print("STRICT TEST FAILED:")
@@ -102,4 +122,4 @@ if __name__ == '__main__':
         print("STRICT TEST PASSED: All variables exactly reflected in CSV.")
 
 if __name__ == "__main__":
-    strict_test("synthetic_event_log.csv", "variables.txt")
+    main()

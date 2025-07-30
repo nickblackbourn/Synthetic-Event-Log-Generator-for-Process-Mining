@@ -1,131 +1,147 @@
-# Additional realistic deviations (with business causes):
-# - Credit Check Escalation: Customer fails automated check, requires manual review (after Check Credit, rejoins at Approve Order)
-# - Customer Cancellation: Customer cancels order after approval (after Approve Order, ends process)
-# - Express Handling: Customer pays for expedited handling (after Receive Order, rejoins at Pick Items)
-Credit Check Escalation: 0.07 | after=Check Credit | steps=Credit Check Escalated,Manual Review,Approve Order
-Customer Cancellation: 0.03 | after=Approve Order | steps=Order Cancellation,Refund Issued
-Express Handling: 0.08 | after=Receive Order | steps=Express Handling,Priority Picking,Priority Packing
-# Add new activities for the above deviations
-Credit Check Escalated
-Manual Review
-Order Cancellation
-Express Handling
-Priority Picking
-Priority Packing
-# More substantial and interesting variants
-Variants:
-Standard: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.5
-VIP: Receive Order, Check Credit, Approve Order, VIP Approval, Gift Packaging, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
-Express: Receive Order, Express Handling, Priority Picking, Priority Packing, Ship Order, Send Invoice, Receive Payment | 0.1
-With Return: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment, Complaint Received, Return Processed, Refund Issued | 0.15
-Cancelled: Receive Order, Check Credit, Approve Order, Order Cancellation, Refund Issued | 0.05
-Escalated: Receive Order, Check Credit, Credit Check Escalated, Manual Review, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
-# Activity durations for new activities
-Credit Check Escalated: 60
-Manual Review: 180
-Order Cancellation: 30
-Express Handling: 30
-Priority Picking: 90
-Priority Packing: 60
-###############################################################
-# Order-to-Cash process for B2B sales
-# Scenario: A B2B company processes customer orders with credit checks, picking, packing, shipping, invoicing, and payment. Deviations and variants illustrate real-world complexity for process mining analysis.
+########################################################################################################
+# YAML configuration for Synthetic Event Log Generator (Order-to-Cash process for B2B sales)
+#
+# This file defines the process model, variants, deviations, activities, durations, and attributes
+# for generating realistic synthetic event logs for process mining analysis.
+#
+# Sections:
+#   - context:      High-level process description
+#   - activities:   List of all possible activities
+#   - activity_durations: Duration (in minutes) for each activity
+#   - case_attributes:    Case-level attributes and possible values
+#   - event_attributes:   Event-level attributes and possible values
+#   - variants:     Main process variants (with frequencies)
+#   - deviations:   Deviations (with business logic, anchors, and steps)
+#
+# Notes:
+#   - All lists and mappings are YAML-compliant for easy parsing in Python (e.g., with PyYAML)
+#   - Comments explain business logic and configuration intent
+########################################################################################################
 
-Context: Order-to-Cash process for B2B sales
+context: Order-to-Cash process for B2B sales
 
+activities:
+  # Core process activities
+  - Receive Order
+  - Check Credit
+  - Approve Order
+  - Order Change Requested
+  - Order Change Approved
+  - Re-pick Items
+  - Re-pack Items
+  - Pick Items
+  - Pack Items
+  - Partial Shipment
+  - Notify Customer
+  - Backorder Created
+  - Ship Backorder
+  - Ship Order
+  - Send Invoice
+  - Payment Reminder Sent
+  - Late Payment
+  - Apply Late Fee
+  - Receive Payment
+  - Complaint Received
+  - Return Processed
+  - Refund Issued
+  - VIP Approval
+  - Gift Packaging
+  # Activities for deviations and special cases
+  - Credit Check Escalated
+  - Manual Review
+  - Order Cancellation
+  - Express Handling
+  - Priority Picking
+  - Priority Packing
 
-Activities:
-Receive Order
-Check Credit
-Approve Order
-Order Change Requested
-Order Change Approved
-Re-pick Items
-Re-pack Items
-Pick Items
-Pack Items
-Partial Shipment
-Notify Customer
-Backorder Created
-Ship Backorder
-Ship Order
-Send Invoice
-Payment Reminder Sent
-Late Payment
-Apply Late Fee
-Receive Payment
-Complaint Received
-Return Processed
-Refund Issued
-VIP Approval
-Gift Packaging
+activity_durations:
+  # Default duration (in minutes) if not specified below
+  Default: 1440  # 1 day per activity
+  Receive Order: 60
+  Check Credit: 240
+  Approve Order: 120
+  Order Change Requested: 60
+  Order Change Approved: 60
+  Re-pick Items: 120
+  Re-pack Items: 90
+  Pick Items: 180
+  Pack Items: 120
+  Partial Shipment: 60
+  Notify Customer: 30
+  Backorder Created: 30
+  Ship Backorder: 360
+  Ship Order: 360
+  Send Invoice: 60
+  Payment Reminder Sent: 30
+  Late Payment: 1440
+  Apply Late Fee: 15
+  Receive Payment: 4320  # 3 days
+  Complaint Received: 30
+  Return Processed: 240
+  Refund Issued: 60
+  VIP Approval: 60
+  Gift Packaging: 30
+  Credit Check Escalated: 60
+  Manual Review: 180
+  Order Cancellation: 30
+  Express Handling: 30
+  Priority Picking: 90
+  Priority Packing: 60
 
-# Deviations (with plausible business logic)
-# - Late Payment: Customer pays invoice late (after Send Invoice)
-# - Order Change: Customer requests change after approval but before picking
-# - Partial Shipment: Only part of the order is shipped (after picking)
+case_attributes:
+  CustomerType: [New, Returning, VIP]
+  Region: [North, South, East, West]
 
-# Multi-step deviations (inserted as a sequence)
-Deviations:
-Order Change: 0.10 | after=Approve Order | steps=Order Change Requested,Order Change Approved,Re-pick Items,Re-pack Items
-Partial Shipment: 0.05 | after=Pack Items | steps=Partial Shipment,Notify Customer,Backorder Created,Ship Backorder
-Late Payment: 0.15 | after=Send Invoice | steps=Payment Reminder Sent,Late Payment,Apply Late Fee
+event_attributes:
+  Resource: [Alice, Bob, Carol, Dave]
+  Channel: [Email, Phone, Web]
 
-# Case-level attributes
-CaseAttributes:
-CustomerType: New, Returning, VIP
-Region: North, South, East, West
+variants:
+  # Main process variants (with frequencies)
+  - name: Standard
+    sequence: [Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment]
+    frequency: 0.6
+  - name: VIP
+    sequence: [Receive Order, Check Credit, Approve Order, VIP Approval, Gift Packaging, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment]
+    frequency: 0.1
+  - name: Express
+    sequence: [Receive Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment]
+    frequency: 0.1
+  - name: With Return
+    sequence: [Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment, Complaint Received, Return Processed, Refund Issued]
+    frequency: 0.2
 
-# Event-level attributes
-EventAttributes:
-Resource: Alice, Bob, Carol, Dave
-Channel: Email, Phone, Web
+deviations:
+  # Each deviation includes business logic, anchor activity, and steps
+  - name: Order Change
+    probability: 0.10
+    after: Approve Order
+    steps: [Order Change Requested, Order Change Approved, Re-pick Items, Re-pack Items]
+    description: Customer requests change after approval but before picking
+  - name: Partial Shipment
+    probability: 0.05
+    after: Pack Items
+    steps: [Partial Shipment, Notify Customer, Backorder Created, Ship Backorder]
+    description: Only part of the order is shipped after packing
+  - name: Late Payment
+    probability: 0.15
+    after: Send Invoice
+    steps: [Payment Reminder Sent, Late Payment, Apply Late Fee]
+    description: Customer pays invoice late
+  - name: Credit Check Escalation
+    probability: 0.07
+    after: Check Credit
+    steps: [Credit Check Escalated, Manual Review, Approve Order]
+    description: Customer fails automated check, requires manual review
+  - name: Customer Cancellation
+    probability: 0.03
+    after: Approve Order
+    steps: [Order Cancellation, Refund Issued]
+    description: Customer cancels order after approval
+  - name: Express Handling
+    probability: 0.08
+    after: Receive Order
+    steps: [Express Handling, Priority Picking, Priority Packing]
+    description: Customer pays for expedited handling
 
-# Variants (showing process diversity)
-# - Standard: Full process with credit check
-# - No Credit Check: Trusted customers skip credit check
-# - Express: Fastest route, minimal steps
-
-# More substantial and interesting variants
-Variants:
-Standard: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.6
-VIP: Receive Order, Check Credit, Approve Order, VIP Approval, Gift Packaging, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
-Express: Receive Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
-With Return: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment, Complaint Received, Return Processed, Refund Issued | 0.2
-
-# Activity durations (in minutes)
-
-DefaultDuration: 1440  # 1 day per activity
-ActivityDurations:
-Receive Order: 60
-Check Credit: 240
-Approve Order: 120
-Order Change Requested: 60
-Order Change Approved: 60
-Re-pick Items: 120
-Re-pack Items: 90
-Pick Items: 180
-Pack Items: 120
-Partial Shipment: 60
-Notify Customer: 30
-Backorder Created: 30
-Ship Backorder: 360
-Ship Order: 360
-Send Invoice: 60
-Payment Reminder Sent: 30
-Late Payment: 1440
-Apply Late Fee: 15
-Receive Payment: 4320  # 3 days
-Complaint Received: 30
-Return Processed: 240
-Refund Issued: 60
-VIP Approval: 60
-Gift Packaging: 30
-
-# Deviation durations (impact in minutes)
-
-# DeviationDurations are now handled by the steps above (each step has its own duration)
-
-# DemoPatterns:
-#   # Bottleneck: Pack Items takes longer for VIP customers
-#   # Rework: Pick Items repeated if Order Change occurs
+########################################################################################################
