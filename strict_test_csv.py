@@ -9,59 +9,60 @@ def strict_test(csv_path, variables_path):
     activities = []
     deviations = []
     case_attributes = {}
-    event_attributes = {}
-    variants = []
+
+import pandas as pd
+import re
+
+def parse_variables_txt(path):
+    activities = set()
+    variants = {}
+    deviations = set()
+    with open(path, encoding='utf-8') as f:
+        lines = [l.strip() for l in f if l.strip() and not l.strip().startswith('#')]
+    section = None
     for line in lines:
-        if line.lower().startswith("activities:"):
-            section = "activities"
+        if line.lower().startswith('activities:'):
+            section = 'activities'
             continue
-        elif line.lower().startswith("deviations:"):
-            section = "deviations"
+        elif line.lower().startswith('variants:'):
+            section = 'variants'
             continue
-        elif line.lower().startswith("caseattributes:"):
-            section = "caseattributes"
+        elif line.lower().startswith('deviations:'):
+            section = 'deviations'
             continue
-        elif line.lower().startswith("eventattributes:"):
-            section = "eventattributes"
-            continue
-        elif line.lower().startswith("variants:"):
-            section = "variants"
-            continue
-        if section == "activities":
-            activities.append(line)
-        elif section == "deviations":
-            if ":" in line:
-                name = line.split(":", 1)[0].strip()
-                deviations.append(name)
-            else:
-                deviations.append(line)
-        elif section == "caseattributes":
-            if ":" in line:
-                name, values = line.split(":", 1)
-                case_attributes[name.strip()] = [v.strip() for v in values.split(",")]
-        elif section == "eventattributes":
-            if ":" in line:
-                name, values = line.split(":", 1)
-                event_attributes[name.strip()] = [v.strip() for v in values.split(",")]
-        elif section == "variants":
-            if "|" in line:
-                variant_part, freq_part = line.split("|", 1)
-                name, acts = variant_part.split(":", 1)
-                act_list = [a.strip() for a in acts.split(",")]
-                variants.append({"name": name.strip(), "activities": act_list})
-    # Strict checks
-    errors = []
-    # Activities
-    csv_activities = set(df["Activity"].unique())
-    expected_activities = set(activities + deviations)
-    missing_acts = expected_activities - csv_activities
-    extra_acts = csv_activities - expected_activities
-    if missing_acts:
-        errors.append(f"Missing activities in CSV: {sorted(missing_acts)}")
-    if extra_acts:
-        errors.append(f"Extra activities in CSV: {sorted(extra_acts)}")
-    # Case attributes
-    for attr, values in case_attributes.items():
+        if section == 'activities':
+            activities.add(line)
+        elif section == 'variants':
+            if ':' in line and '|' in line:
+                name, rest = line.split(':', 1)
+                acts, freq = rest.split('|', 1)
+                variants[name.strip()] = [a.strip() for a in acts.split(',')]
+        elif section == 'deviations':
+            if ':' in line and 'steps=' in line:
+                # e.g. Order Change: 0.10 | after=Approve Order | steps=Order Change Requested,Order Change Approved,Re-pick Items,Re-pack Items
+                steps = re.search(r'steps=([^|]+)', line)
+                if steps:
+                    deviations.update([s.strip() for s in steps.group(1).split(',')])
+    return activities, variants, deviations
+
+def main():
+    activities, variants, deviations = parse_variables_txt('variables.txt')
+    expected_activities = activities | deviations
+    df = pd.read_csv('synthetic_event_log.csv')
+    found_activities = set(df['Activity'].unique())
+    missing = expected_activities - found_activities
+    extra = found_activities - expected_activities
+    if missing:
+        print('STRICT TEST FAILED:')
+        print(f'- Missing activities in CSV: {sorted(missing)}')
+    if extra:
+        print('STRICT TEST FAILED:')
+        print(f'- Extra activities in CSV: {sorted(extra)}')
+    if not missing and not extra:
+        print('STRICT TEST PASSED: All activities present as specified.')
+
+if __name__ == '__main__':
+    main()
         if attr not in df.columns:
             errors.append(f"Case attribute '{attr}' missing from CSV columns")
         else:

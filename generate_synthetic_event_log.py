@@ -102,8 +102,10 @@ def read_variables(file_path):
             elif section == "activities":
                 activities.append(line)
             elif section == "deviations":
-                # Support: DeviationName: prob | before=... or | after=... | steps=...
-                if ":" in line:
+                # Only parse valid deviation lines: must have ':' and 'after='
+                if not line or line.startswith('#'):
+                    continue
+                if ':' in line and 'after=' in line:
                     parts = [p.strip() for p in line.split("|")]
                     name_prob = parts[0]
                     name, prob = name_prob.split(":", 1)
@@ -117,9 +119,14 @@ def read_variables(file_path):
                             dev["placement_seq"] = [x.strip() for x in p[len("after="):].split(",")]
                         elif p.startswith("steps="):
                             dev["steps"] = [x.strip() for x in p[len("steps="):].split(",")]
+                    # Defensive: ensure 'after' is always present
+                    if dev["placement_type"] != "after" or not dev["placement_seq"]:
+                        raise ValueError(f"Deviation '{name.strip()}' is missing required 'after' anchor. Line: {line}")
+                    # For compatibility with rest of code
+                    dev['after'] = dev['placement_seq'][0] if dev['placement_type'] == 'after' else None
                     deviations[name.strip()] = dev
-                else:
-                    deviations[line] = {"prob": 0.1, "placement": None, "placement_type": None, "placement_seq": None, "steps": None}
+                elif line:
+                    raise ValueError(f"Malformed deviation line (must have ':' and 'after='): {line}")
             elif section == "caseattributes":
                 if ":" in line:
                     name, values = line.split(":", 1)
@@ -193,12 +200,10 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
                 # Only support xN for previous duration
                 return impact_clean
         return 0
-    deviation_names = list(deviations.keys())
-    deviation_probs = {k: v["prob"] for k, v in deviations.items()}
+    # UX-driven: Guarantee all variants and deviations are present as specified
     if not variants:
         variants = [{"name": "Default", "activities": activities, "freq": 1.0}]
     n_cases_list = list(range(1, n_cases + 1))
-    # Assign cases to variants based on frequencies, always sum to n_cases
     variant_case_counts = [int(round(v["freq"] * n_cases)) for v in variants]
     while sum(variant_case_counts) < n_cases:
         variant_case_counts[0] += 1
@@ -208,64 +213,49 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
     for idx, v in enumerate(variants):
         case_variant_assignment += [idx] * variant_case_counts[idx]
     random.shuffle(case_variant_assignment)
-    # Preselect cases for each deviation to match requested percentages
-    deviation_cases = {dev: set(random.sample(n_cases_list, int(round(deviation_probs[dev] * n_cases)))) for dev in deviation_names}
+
+    # Prepare deviation assignment: for each deviation, assign to correct number of cases
+    deviation_names = list(deviations.keys())
+    deviation_probs = {k: v["prob"] for k, v in deviations.items()}
+    deviation_steps_set = set()
+    for deviation in deviations.values():
+        deviation_steps_set.update(deviation['steps'])
+    deviation_case_ids = {dev: set(random.sample(n_cases_list, int(round(deviation_probs[dev] * n_cases)))) for dev in deviation_names}
+
+    # Track which deviations were actually placed
+    placed_deviation_counts = {dev: 0 for dev in deviation_names}
+    missing_deviation_cases = {dev: [] for dev in deviation_names}
+
     for i, case_id in enumerate(n_cases_list):
         case_name = f"Case_{case_id}"
         variant = variants[case_variant_assignment[i]]
         path = variant["activities"].copy()
         # Insert deviations for this case if preselected
         for dev in deviation_names:
-            if case_id in deviation_cases[dev]:
+            if case_id in deviation_case_ids[dev]:
                 dev_info = deviations[dev]
-                placement_type = dev_info["placement_type"]
-                placement_seq = dev_info["placement_seq"]
-                dev_steps = dev_info.get("steps") or [dev]
-                # Multi-step deviation placement
-                if placement_type and placement_seq:
-                    seq_len = len(placement_seq)
-                    found = False
-                    for idx in range(len(path) - seq_len + 1):
-                        if path[idx:idx+seq_len] == placement_seq:
-                            if placement_type == "before":
-                                for offset, step in enumerate(dev_steps):
-                                    path.insert(idx + offset, step)
-                            elif placement_type == "after":
-                                for offset, step in enumerate(dev_steps):
-                                    path.insert(idx + seq_len + offset, step)
-                            found = True
-                            break
-                    if not found:
-                        print(f"Warning: Could not place deviation '{dev}' {placement_type} sequence {placement_seq} in case {case_name}")
-                    # Do NOT place deviation if not found
+                anchor = dev_info["after"]
+                steps = dev_info["steps"]
+                # Find anchor position
+                if anchor in path:
+                    idx = path.index(anchor)
+                    # Insert steps after anchor
+                    path = path[:idx+1] + steps + path[idx+1:]
+                    placed_deviation_counts[dev] += 1
                 else:
-                    # Fallback: skip placement if no valid placement_type/seq
-                    print(f"Warning: No valid placement for deviation '{dev}' in case {case_name}")
-        # Shuffle for a fraction of cases (for realism)
-        if random.random() < shuffle_fraction:
-            random.shuffle(path)
-        n_acts = min(len(path), max_activities)
-        truncated_path = path[:n_acts]
-        required_devs = [dev for dev in deviation_names if case_id in deviation_cases[dev]]
-        for dev in required_devs:
-            if dev not in truncated_path:
-                truncated_path = [dev] + truncated_path[:-1]
+                    missing_deviation_cases[dev].append(case_id)
+        # Enforce that the first activity is not a deviation step
+        if path and path[0] in deviation_steps_set:
+            print(f"Warning: Case {case_id} starts with deviation step '{path[0]}'. Skipping this case.")
+            continue
+        # Build the case events
         case_attr_values = {attr: random.choice(values) for attr, values in case_attributes.items()}
-        # Generate timestamps and event attributes
         start_time = datetime.now() - timedelta(days=random.randint(0, 365))
         prev_acts = []
         prev_duration = None
         timestamp = start_time
-        for j, act in enumerate(truncated_path):
-            # Duration logic
+        for j, act in enumerate(path):
             duration = get_duration(act, prev_acts, case_attr_values, timing_config)
-            # If deviation, apply impact
-            if act in deviation_names:
-                impact = apply_deviation_time(act, act, timing_config)
-                if isinstance(impact, int):
-                    duration += impact
-                elif isinstance(impact, str) and impact.startswith('x') and prev_duration:
-                    duration = int(float(impact[1:]) * prev_duration)
             timestamp = timestamp + timedelta(minutes=duration)
             event = {
                 "case:concept:name": case_name,
@@ -278,6 +268,28 @@ def generate_event_log(context, activities, deviations, case_attributes, event_a
             data.append(event)
             prev_acts.append(act)
             prev_duration = duration
+
+    # Post-generation validation and user feedback
+    for dev in deviation_names:
+        expected = int(round(deviation_probs[dev] * n_cases))
+        actual = placed_deviation_counts[dev]
+        if actual < expected:
+            print(f"Warning: Deviation '{dev}' was only placed in {actual} of {expected} requested cases. Missing in cases: {missing_deviation_cases[dev]}")
+
+    # Validate that all activities and deviations are present
+    all_activities = set()
+    for v in variants:
+        all_activities.update(v["activities"])
+    for dev in deviations.values():
+        all_activities.update(dev["steps"])
+    output_activities = set([row["Activity"] for row in data])
+    missing_acts = all_activities - output_activities
+    extra_acts = output_activities - all_activities
+    if missing_acts:
+        print(f"Warning: Missing activities in output: {sorted(missing_acts)}")
+    if extra_acts:
+        print(f"Warning: Extra activities in output: {sorted(extra_acts)}")
+
     return pd.DataFrame(data)
 
 if __name__ == "__main__":

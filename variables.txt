@@ -1,3 +1,32 @@
+# Additional realistic deviations (with business causes):
+# - Credit Check Escalation: Customer fails automated check, requires manual review (after Check Credit, rejoins at Approve Order)
+# - Customer Cancellation: Customer cancels order after approval (after Approve Order, ends process)
+# - Express Handling: Customer pays for expedited handling (after Receive Order, rejoins at Pick Items)
+Credit Check Escalation: 0.07 | after=Check Credit | steps=Credit Check Escalated,Manual Review,Approve Order
+Customer Cancellation: 0.03 | after=Approve Order | steps=Order Cancellation,Refund Issued
+Express Handling: 0.08 | after=Receive Order | steps=Express Handling,Priority Picking,Priority Packing
+# Add new activities for the above deviations
+Credit Check Escalated
+Manual Review
+Order Cancellation
+Express Handling
+Priority Picking
+Priority Packing
+# More substantial and interesting variants
+Variants:
+Standard: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.5
+VIP: Receive Order, Check Credit, Approve Order, VIP Approval, Gift Packaging, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
+Express: Receive Order, Express Handling, Priority Picking, Priority Packing, Ship Order, Send Invoice, Receive Payment | 0.1
+With Return: Receive Order, Check Credit, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment, Complaint Received, Return Processed, Refund Issued | 0.15
+Cancelled: Receive Order, Check Credit, Approve Order, Order Cancellation, Refund Issued | 0.05
+Escalated: Receive Order, Check Credit, Credit Check Escalated, Manual Review, Approve Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment | 0.1
+# Activity durations for new activities
+Credit Check Escalated: 60
+Manual Review: 180
+Order Cancellation: 30
+Express Handling: 30
+Priority Picking: 90
+Priority Packing: 60
 ###############################################################
 # Order-to-Cash process for B2B sales
 # Scenario: A B2B company processes customer orders with credit checks, picking, packing, shipping, invoicing, and payment. Deviations and variants illustrate real-world complexity for process mining analysis.
