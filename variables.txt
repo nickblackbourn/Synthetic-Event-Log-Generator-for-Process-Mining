@@ -104,6 +104,8 @@ variants:
   - name: VIP
     sequence: [Receive Order, Check Credit, Approve Order, VIP Approval, Gift Packaging, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment]
     frequency: 0.1
+    attributes:
+      CustomerType: VIP
   - name: Express
     sequence: [Receive Order, Pick Items, Pack Items, Ship Order, Send Invoice, Receive Payment]
     frequency: 0.1
@@ -128,6 +130,9 @@ deviations:
     after: Send Invoice
     steps: [Payment Reminder Sent, Late Payment, Apply Late Fee]
     description: Customer pays invoice late
+    attributes:
+      CustomerType: New
+      Region: East
   - name: Credit Check Escalation
     probability: 0.07
     after: Check Credit
