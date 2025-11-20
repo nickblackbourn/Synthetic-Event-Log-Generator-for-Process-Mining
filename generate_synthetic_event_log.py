@@ -1,3 +1,6 @@
+# pip install pm4py
+# pip install pandas
+# pip install pyyaml
 import os
 import random
 from datetime import datetime, timedelta
