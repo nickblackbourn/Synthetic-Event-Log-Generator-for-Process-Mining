@@ -10,7 +10,7 @@ This tool generates synthetic event logs for process mining and process intellig
 - **Strict conformance**: No legacy or unreachable code; all logic is YAML-driven
 - **Precise deviation and variant frequencies** (per-case probability/frequency)
 - **Support for case and event attributes**
-- **Activity and deviation durations** (affecting timestamps)
+- **Activity durations** (affecting timestamps)
 - **CSV output for easy analysis**
 
 ## Requirements
@@ -105,7 +105,7 @@ deviations:
 ### 2. Run the generator
 
 ```bash
-python generate_synthetic_event_log.py --variables-file variables.txt --output-file synthetic_event_log.csv --n-cases 1000 --random-seed 42 --max-activities 20
+python generate_synthetic_event_log.py --variables-file variables.txt --output-file synthetic_event_log.csv --n-cases 1000 --random-seed 42
 ```
 
 #### Key CLI options
@@ -113,7 +113,6 @@ python generate_synthetic_event_log.py --variables-file variables.txt --output-f
 - `--output-file`: Output CSV file (default: synthetic_event_log.csv)
 - `--n-cases`: Number of cases to generate (default: 100)
 - `--random-seed`: Set for reproducible results
-- `--max-activities`: Maximum number of activities per case (default: 8)
 
 ### 3. Validate and analyze the output
 
@@ -137,17 +136,17 @@ The generated CSV will contain one row per event, with columns for case name, ac
 - **Attribute-based assignment**: Use the `attributes` field in variants or deviations to restrict them to specific case attribute values.
 - **Multi-step deviations**: Use the `steps` field to insert a sequence of activities for a deviation.
 - **Strict placement**: Deviations are only inserted if the placement rule matches the variant path; otherwise, a warning is logged and the deviation is skipped.
-- **Timestamps and durations**: Each activity (including deviation steps) gets its own duration and timestamp, reflecting the true process flow and impact of deviations.
+- **Timestamps and durations**: Each activity gets its own duration from the `activity_durations` configuration, affecting the timestamp of subsequent events.
 - **Variants**: Frequencies should sum to 1.0. Cases are distributed accordingly.
 - **Attributes**: Add as many case/event attributes as needed; values are randomly assigned unless restricted by a variant or deviation.
 
 ## Example Output
 | case:concept:name | Activity                | Timestamp           | CustomerType | Region | Resource | Channel |
 |-------------------|-------------------------|---------------------|--------------|--------|----------|---------|
-| Case_1            | Receive Order           | 2025-07-27 10:00:00 | VIP          | North  | Alice    | Email   |
-| Case_1            | Check Credit            | 2025-07-27 10:10:00 | VIP          | North  | Bob      | Phone   |
-| Case_1            | Approve Order           | 2025-07-27 10:20:00 | VIP          | North  | Carol    | Web     |
-| Case_1            | Order Change Requested  | 2025-07-27 10:25:00 | VIP          | North  | Dave     | Email   |
+| Case_1            | Receive Order           | 27.07.2025 10:00:00 | VIP          | North  | Alice    | Email   |
+| Case_1            | Check Credit            | 27.07.2025 11:00:00 | VIP          | North  | Bob      | Phone   |
+| Case_1            | Approve Order           | 27.07.2025 15:00:00 | VIP          | North  | Carol    | Web     |
+| Case_1            | Order Change Requested  | 27.07.2025 17:00:00 | VIP          | North  | Dave     | Email   |
 | ...               | ...                     | ...                 | ...          | ...    | ...      | ...     |
 
 ## License
